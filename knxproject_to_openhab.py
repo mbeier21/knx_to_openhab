@@ -30,6 +30,80 @@ re_item_Room =re.compile(pattern_item_Room)
 re_item_Floor =re.compile(pattern_item_Floor)
 re_floor_nameshort =re.compile(pattern_floor_nameshort)
 
+def create_floor(floor, prj_loc):
+    prj_loc['floors'].append({
+        'Description':floor['description'],
+        'Group name':None,
+        'name_long':floor['description'],
+        'name_short':None,
+        'rooms':[]
+        })
+    prj_floor=prj_loc['floors'][-1]
+    logging.debug("Added floor: %s %s",floor['description'],floor['name'])
+    res = re_floor_nameshort.search(floor['name'])
+    if res is not None:
+        if res.group(0).startswith(item_Floor_nameshort_prefix):
+            prj_floor['name_short']=res.group(0)
+        else:
+            prj_floor['name_short']=item_Floor_nameshort_prefix+res.group(0)
+    elif not floor['name'].startswith(item_Floor_nameshort_prefix) and len(floor['name']) < 6:
+        prj_floor['name_short']=item_Floor_nameshort_prefix+floor['name']
+    else:
+        prj_floor['Description']=floor['name']
+        prj_floor['name_short']=item_Floor_nameshort_prefix+floor['name']
+    if prj_floor['Description'] == '':
+        prj_floor['Description']=floor['name']
+    logging.debug("Processed floor: %s",prj_floor['Description'])
+    for room in floor['spaces'].values():
+        if room['type'] in ('Room','Corridor','Stairway'):
+            prj_floor['rooms'].append({
+                'Description':room['description'],
+                'Group name':None,
+                'name_long':room['description'],
+                'name_short':None,
+                'devices':room['devices'],
+                'Addresses':[]
+            })
+            prj_room=prj_floor['rooms'][-1]
+            logging.debug("Added room: %s %s",room['description'],room['name'])
+            res_floor = re_item_Floor.search(room['name'])
+            res_room = re_item_Room.search(room['name'])
+            room_nameplain = room['name']
+            room_namelong = ''
+            if res_floor is not None:
+                room_namelong+=res_floor.group(0)
+                room_nameplain=str.replace(room_nameplain,res_floor.group(0),"").strip()
+                if prj_floor['name_short']==floor['name'] or prj_floor['name_short']==item_Floor_nameshort_prefix+floor['name']:
+                    prj_floor['name_short']=res_floor.group(0)
+                    prj_floor['Description']=str.replace(floor['name'],res_floor.group(0),"").strip()
+            else:
+                if not prj_floor['name_short'] == '':
+                    room_namelong+=prj_floor['name_short']
+                else:
+                    room_namelong+=item_Floor_nameshort_prefix+'XX'
+            if res_room is not None:
+                room_namelong+=res_room.group(0)
+                room_nameplain=str.replace(room_nameplain,res_room.group(0),"").strip()
+                prj_room['name_short']=res_room.group(0)
+            else:
+                prj_room['name_short']=item_Room_nameshort_prefix+'RMxx'
+                room_namelong+=item_Room_nameshort_prefix+'RMxx'
+            if room_nameplain == '':
+                room_nameplain=room['usage_text']
+            prj_room['Description']=room_nameplain
+            if prj_room['name_long'] == '':
+                prj_room['name_long']=room_namelong
+            if not prj_room['Group name']:
+                prj_room['Group name']=prj_room['name_short']
+            logging.debug("Processed room: %s",prj_room['Description'])
+        elif room['type'] in ('Floor','Stairway','Corridor','BuildingPart'):
+            prj_loc = create_floor(room, prj_loc)
+    if prj_floor['name_long'] == '':
+        prj_floor['name_long']=prj_floor['name_short']
+    if not prj_floor['Group name']:
+        prj_floor['Group name']=prj_floor['name_short']
+    return prj_loc
+
 def create_building(project: KNXProject):
     """Creats an Building with all Floors and Rooms"""
     locations = project['locations']
@@ -50,79 +124,11 @@ def create_building(project: KNXProject):
             logging.debug("Added building: %s",loc['name'])
         for floor in loc['spaces'].values():
             if floor['type'] in ('Floor','Stairway','Corridor','BuildingPart'):
-                prj_loc['floors'].append({
-                    'Description':floor['description'],
-                    'Group name':None,
-                    'name_long':floor['description'],
-                    'name_short':None,
-                    'rooms':[]
-                    })
-                prj_floor=prj_loc['floors'][-1]
-                logging.debug("Added floor: %s %s",floor['description'],floor['name'])
-                res = re_floor_nameshort.search(floor['name'])
-                if res is not None:
-                    if res.group(0).startswith(item_Floor_nameshort_prefix):
-                        prj_floor['name_short']=res.group(0)
-                    else:
-                        prj_floor['name_short']=item_Floor_nameshort_prefix+res.group(0)
-                elif not floor['name'].startswith(item_Floor_nameshort_prefix) and len(floor['name']) < 6:
-                    prj_floor['name_short']=item_Floor_nameshort_prefix+floor['name']
-                else:
-                    prj_floor['Description']=floor['name']
-                    prj_floor['name_short']=item_Floor_nameshort_prefix+floor['name']
-                if prj_floor['Description'] == '':
-                    prj_floor['Description']=floor['name']
-                logging.debug("Processed floor: %s",prj_floor['Description'])
-                for room in floor['spaces'].values():
-                    if room['type'] in ('Room','Corridor','Stairway'):
-                        prj_floor['rooms'].append({
-                            'Description':room['description'],
-                            'Group name':None,
-                            'name_long':room['description'],
-                            'name_short':None,
-                            'devices':room['devices'],
-                            'Addresses':[]
-                        })
-                        prj_room=prj_floor['rooms'][-1]
-                        logging.debug("Added room: %s %s",room['description'],room['name'])
-                        res_floor = re_item_Floor.search(room['name'])
-                        res_room = re_item_Room.search(room['name'])
-                        room_nameplain = room['name']
-                        room_namelong = ''
-                        if res_floor is not None:
-                            room_namelong+=res_floor.group(0)
-                            room_nameplain=str.replace(room_nameplain,res_floor.group(0),"").strip()
-                            if prj_floor['name_short']==floor['name'] or prj_floor['name_short']==item_Floor_nameshort_prefix+floor['name']:
-                                prj_floor['name_short']=res_floor.group(0)
-                                prj_floor['Description']=str.replace(floor['name'],res_floor.group(0),"").strip()
-                        else:
-                            if not prj_floor['name_short'] == '':
-                                room_namelong+=prj_floor['name_short']
-                            else:
-                                room_namelong+=item_Floor_nameshort_prefix+'XX'
-                        if res_room is not None:
-                            room_namelong+=res_room.group(0)
-                            room_nameplain=str.replace(room_nameplain,res_room.group(0),"").strip()
-                            prj_room['name_short']=res_room.group(0)
-                        else:
-                            prj_room['name_short']=item_Room_nameshort_prefix+'RMxx'
-                            room_namelong+=item_Room_nameshort_prefix+'RMxx'
-                        if room_nameplain == '':
-                            room_nameplain=room['usage_text']
-                        prj_room['Description']=room_nameplain
-                        if prj_room['name_long'] == '':
-                            prj_room['name_long']=room_namelong
-                        if not prj_room['Group name']:
-                            prj_room['Group name']=prj_room['name_short']
-                        logging.debug("Processed room: %s",prj_room['Description'])
-                if prj_floor['name_long'] == '':
-                    prj_floor['name_long']=prj_floor['name_short']
-                if not prj_floor['Group name']:
-                    prj_floor['Group name']=prj_floor['name_short']
-
+                prj_loc = create_floor(floor, prj_loc)
     # Logging information about the final building structure
-    #logging.info(f"Building structure created: {prj}")
+    logging.info(f"Building structure created: {prj}")
     return prj
+
 def get_addresses(project: KNXProject):
     """
     Extracts and processes information from a KNX project.
