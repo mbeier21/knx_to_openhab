@@ -5,3 +5,4 @@ openhab/*
 example.ini
 .vscode/*
 __pycache__/*
+.venv/*
