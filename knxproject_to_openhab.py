@@ -114,11 +114,11 @@ def create_building(project: KNXProject):
                             prj_room['name_long']=room_namelong
                         if not prj_room['Group name']:
                             prj_room['Group name']=prj_room['name_short']
+                        logging.debug("Processed room: %s",prj_room['Description'])
                 if prj_floor['name_long'] == '':
                     prj_floor['name_long']=prj_floor['name_short']
                 if not prj_floor['Group name']:
                     prj_floor['Group name']=prj_floor['name_short']
-                logging.debug("Processed room: %s",prj_room['Description'])
 
     # Logging information about the final building structure
     #logging.info(f"Building structure created: {prj}")
